@@ -1,0 +1,13 @@
+__pycache__/
+*.csv
+*.ini
+*.log
+scan_results.txt
+.dockerignore
+Dockerfile
+*.yaml
+test.py
+.vscode/
+!Sc/Reference.png
+Sc/*
+
