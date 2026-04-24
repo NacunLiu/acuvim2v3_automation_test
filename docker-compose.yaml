@@ -1,0 +1,17 @@
+version: "3.9"
+
+services:
+  communication_protocol_test:
+    build:
+      context: .
+      dockerfile: communication_protocol_test/Dockerfile
+    container_name: communication_protocol_test
+    working_dir: /app
+    stdin_open: true
+    tty: true
+    restart: "no"
+    volumes:
+      - ./communication_protocol_test:/app
+      - ./communication_protocol_test/logs:/app/logs
+      - ./communication_protocol_test/data:/app/data
+    command: ["python", "run.py"]
