@@ -3,8 +3,6 @@ __pycache__/
 *.ini
 *.log
 scan_results.txt
-.dockerignore
-Dockerfile
 *.yaml
 test.py
 .vscode/
