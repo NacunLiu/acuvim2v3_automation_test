@@ -5,6 +5,8 @@ services:
       dockerfile: communication_protocol_test/Dockerfile
     container_name: communication_protocol_test
     working_dir: /app
+    environment:
+      ACU_MANUAL_POWER: "true"
     stdin_open: true
     tty: true
     restart: "no"

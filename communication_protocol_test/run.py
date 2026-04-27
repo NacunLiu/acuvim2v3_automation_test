@@ -42,6 +42,7 @@ def env_flag(name, default):
 
 
 BROWSER_ENABLED = env_flag("ACU_ENABLE_BROWSER", HAS_DISPLAY and not RUNNING_IN_CONTAINER)
+MANUAL_POWER_MODE = env_flag("ACU_MANUAL_POWER", False)
 
 
 def normalize_port_input(raw_value, available_ports):
@@ -53,6 +54,37 @@ def normalize_port_input(raw_value, available_ports):
         if com_candidate in available_ports:
             return com_candidate
     return candidate
+
+
+def wait_with_countdown(seconds, reason):
+    logger.info('%s Waiting %s seconds.', reason, seconds)
+    sleep(seconds)
+
+
+class ManualPowerController:
+    def __init__(self, label='meter'):
+        self.label = label
+
+    def loading_animation(self, duration):
+        wait_with_countdown(duration, f'Manual wait for {self.label}.')
+
+    async def _prompt(self, action, wait_seconds):
+        print(f"{action} {self.label} manually, then press Enter to continue.")
+        input()
+        await asyncio.sleep(wait_seconds)
+
+    async def powerCycleSlow(self):
+        await self._prompt('Please reboot', 90)
+
+    async def powerCycleSuperSlow(self):
+        await self._prompt('Please reboot', 180)
+
+    async def powerOn(self, sleep=None):
+        wait_seconds = 30 if sleep else 5
+        await self._prompt('Please power on', wait_seconds)
+
+    async def powerOff(self):
+        await self._prompt('Please power off', 5)
 
 """
 AccuenergyModbusRequest Class
@@ -980,6 +1012,9 @@ async def AsyncReadModelType(Baudrate, COM):
 # safe power cycle will call the plug to reboot meter, this function will make sure to capture ERROR when the wifi is down
 # retry as desginated times then indicating to manually reboot to continue 
 async def safe_power_cycle(acuClass, retries=3, delay=30):
+        if MANUAL_POWER_MODE:
+            await acuClass.plug.powerCycleSuperSlow()
+            return
         for attempt in range(1, retries + 1):
           try:
               await acuClass.plug.powerCycleSuperSlow()
@@ -1278,15 +1313,32 @@ if __name__ == '__main__':
     continueAdding = True
     processID = 1
     portList = serial_ports()
-    plugMap = targetIp
-    plugList = list(targetIp.keys())
+    plugMap = {} if MANUAL_POWER_MODE else targetIp
+    plugList = [] if MANUAL_POWER_MODE else list(targetIp.keys())
     default_port = 'COM6'
     default_plug = 2
+
+    logger.info('Detected serial ports: %s', portList)
+    if MANUAL_POWER_MODE:
+        logger.info('Manual power mode enabled. Kasa discovery and switch control are skipped.')
+    else:
+        logger.info('Detected plug ids: %s', plugList)
+    if not MANUAL_POWER_MODE and not plugList:
+        logger.warning(
+            "No Kasa plugs were discovered. Set ACU_PLUG_IP_MAP (example: 2=172.27.24.50) "
+            "or adjust ACU_PLUG_SUBNET / ACU_PLUG_SCAN_TIMEOUT."
+        )
+    if not portList:
+        logger.warning("No serial ports were detected.")
 
     portOrder = []
     plugOrder = []
 
-    if (default_port in portList and default_plug in plugList):
+    if MANUAL_POWER_MODE and default_port in portList:
+        logger.info('Default setup detected. Using %s in manual power mode', default_port)
+        portOrder.append(default_port)
+        continueAdding = False
+    elif (default_port in portList and default_plug in plugList):
         logger.info('Default setup detected. Using %s with plug %s', default_port, default_plug)
         portOrder.append(default_port)
         plugOrder.append(default_plug)
@@ -1295,13 +1347,23 @@ if __name__ == '__main__':
         continueAdding = False
 
     while (continueAdding and portList):
-        print('Available ports:', portList, 'available plug:', plugList)
+        if MANUAL_POWER_MODE:
+            print('Available ports:', portList)
+        else:
+            print('Available ports:', portList, 'available plug:', plugList)
         portNUM = input('Process {} will connect to com port ' \
                         .format(processID))
         portNUM = normalize_port_input(portNUM, portList)
-        plugId = int(input('With Plug '))
+        if MANUAL_POWER_MODE and portNUM in portList:
+            continueAdding = True if ('Y' == input('Enter y/Y to add another meter or none to continue ') \
+                                      .upper()) else False
+            processID += 1
+            portOrder.append(portNUM)
+            portList.remove(portNUM)
+        else:
+            plugId = int(input('With Plug '))
 
-        if (portNUM in portList and plugId in range(6)):  # verify the integrity of inputs
+        if (not MANUAL_POWER_MODE and portNUM in portList and plugId in range(6)):  # verify the integrity of inputs
             continueAdding = True if ('Y' == input('Enter y/Y to add another meter or none to continue ') \
                                       .upper()) else False
             # input y to add new meter
@@ -1317,9 +1379,11 @@ if __name__ == '__main__':
     shared_failCount = multiprocessing.Value('i', 0)
 
     for c, port in enumerate(portOrder):
-        PlugIp = plugMap[plugOrder[c]][1]
-        # print(PlugIp,port)
-        plug = KasaSmartPlug(PlugIp)
+        if MANUAL_POWER_MODE:
+            plug = ManualPowerController(f'meter on {port}')
+        else:
+            PlugIp = plugMap[plugOrder[c]][1]
+            plug = KasaSmartPlug(PlugIp)
         TR = TestRunner(c + 1, plug, port)
         process = multiprocessing.Process(target=TR.run_tests, \
                                           args=(shared_failCount, \
@@ -1354,8 +1418,11 @@ if __name__ == '__main__':
     openbrowserlock = multiprocessing.Lock()
     tasks = []
     for c, port in enumerate(portOrder):
-        PlugIp = plugMap[plugOrder[c]][1]
-        plug = KasaSmartPlug(PlugIp)
+        if MANUAL_POWER_MODE:
+            plug = ManualPowerController(f'meter on {port}')
+        else:
+            PlugIp = plugMap[plugOrder[c]][1]
+            plug = KasaSmartPlug(PlugIp)
         TR = TestRunner(c + 1, plug, port)
         process = multiprocessing.Process(target=TR.run_webpush, \
                                           args=(shared_failCount, \

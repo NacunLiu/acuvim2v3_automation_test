@@ -20,6 +20,13 @@ import subprocess
 from typing import Dict, Tuple
 
 
+def _env_flag(name: str, default: bool) -> bool:
+    value = os.environ.get(name)
+    if value is None:
+        return default
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
 # =========================
 # User-configurable section
 # =========================
@@ -38,6 +45,8 @@ TARGET_MACS: Dict[str, int] = {
 
 # Current Wi-Fi subnet is 172.27.24.0/23; env var can still override this.
 SUBNET = os.environ.get("ACU_PLUG_SUBNET", "172.27.24.0/23")
+SCAN_TIMEOUT_SECONDS = int(os.environ.get("ACU_PLUG_SCAN_TIMEOUT", "30"))
+MANUAL_POWER_MODE = _env_flag("ACU_MANUAL_POWER", False)
 
 
 # =========================
@@ -46,6 +55,38 @@ SUBNET = os.environ.get("ACU_PLUG_SUBNET", "172.27.24.0/23")
 
 _CACHE: Dict[int, Tuple[str, str]] | None = None
 _LAST_SCAN_ERROR: str | None = None
+
+
+def _parse_explicit_plug_map() -> Dict[int, Tuple[str, str]]:
+    """Parse manual plug IP overrides from env.
+
+    Supported formats:
+    - ACU_PLUG_IP_MAP="2=172.27.24.50,1=172.27.24.51"
+    - ACU_PLUG_2_IP="172.27.24.50"
+    """
+    result: Dict[int, Tuple[str, str]] = {}
+    raw_map = os.environ.get("ACU_PLUG_IP_MAP", "").strip()
+
+    if raw_map:
+        for entry in raw_map.split(","):
+            entry = entry.strip()
+            if not entry or "=" not in entry:
+                continue
+            plug_id_text, ip = entry.split("=", 1)
+            try:
+                plug_id = int(plug_id_text.strip())
+            except ValueError:
+                continue
+            ip = ip.strip()
+            if ip:
+                result[plug_id] = (f"MANUAL-{plug_id}", ip)
+
+    for plug_id in range(1, 7):
+        env_ip = os.environ.get(f"ACU_PLUG_{plug_id}_IP", "").strip()
+        if env_ip:
+            result[plug_id] = (f"MANUAL-{plug_id}", env_ip)
+
+    return result
 
 
 def _run_nmap_ping_scan(subnet: str, timeout_s: int = 30) -> str:
@@ -104,7 +145,12 @@ def get_target_ip_map(force_refresh: bool = False) -> Dict[int, Tuple[str, str]]
     if _CACHE is not None and not force_refresh:
         return _CACHE
 
-    mapping = scan_subnet_for_macs(SUBNET)
+    explicit_map = _parse_explicit_plug_map()
+    if explicit_map:
+        _CACHE = explicit_map
+        return _CACHE
+
+    mapping = scan_subnet_for_macs(SUBNET, timeout_s=SCAN_TIMEOUT_SECONDS)
     result: Dict[int, Tuple[str, str]] = {}
 
     for mac, plug_no in TARGET_MACS.items():
@@ -118,7 +164,7 @@ def get_target_ip_map(force_refresh: bool = False) -> Dict[int, Tuple[str, str]]
 
 # Legacy global for backward compatibility
 try:
-    targetIp: Dict[int, Tuple[str, str]] = get_target_ip_map()
+    targetIp: Dict[int, Tuple[str, str]] = {} if MANUAL_POWER_MODE else get_target_ip_map()
 except Exception:
     targetIp = {}
 
@@ -132,4 +178,8 @@ if __name__ == "__main__":
         print(
             "No plug found by MAC on this subnet. Possible reasons: "
             "Wi-Fi client isolation / no MAC in nmap output / nmap not in PATH / need Admin."
+        )
+        print(
+            "Tip: bypass scanning with ACU_PLUG_IP_MAP, for example "
+            "'ACU_PLUG_IP_MAP=2=172.27.24.50'"
         )
