@@ -7,36 +7,42 @@ import os
 import shutil
 import sys
 
-try:
-    import cv2
-except Exception:
-    cv2 = None
-
-try:
-    from skimage.metrics import structural_similarity as ssim
-except Exception:
-    ssim = None
-
-try:
-    import pyautogui
-except Exception:
-    pyautogui = None
-
-try:
-    from PIL import ImageGrab
-except Exception:
-    ImageGrab = None
-
-try:
-    import screeninfo
-except Exception:
-    screeninfo = None
-
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 SCREENSHOT_DIR = os.path.join(BASE_DIR, 'data', 'screenshots')
 IS_WINDOWS = sys.platform.startswith("win")
 HAS_DISPLAY = IS_WINDOWS or bool(os.environ.get("DISPLAY") or os.environ.get("WAYLAND_DISPLAY"))
+cv2 = None
+ssim = None
+pyautogui = None
+ImageGrab = None
+screeninfo = None
+
+if IS_WINDOWS:
+    try:
+        import cv2
+    except Exception:
+        cv2 = None
+
+    try:
+        from skimage.metrics import structural_similarity as ssim
+    except Exception:
+        ssim = None
+
+    try:
+        import pyautogui
+    except Exception:
+        pyautogui = None
+
+    try:
+        from PIL import ImageGrab
+    except Exception:
+        ImageGrab = None
+
+    try:
+        import screeninfo
+    except Exception:
+        screeninfo = None
 
 
 def _env_flag(name, default):
