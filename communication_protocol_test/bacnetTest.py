@@ -3,11 +3,19 @@
 
 import subprocess
 from time import sleep
-import cv2
-from skimage.metrics import structural_similarity as ssim
 import os
 import shutil
 import sys
+
+try:
+    import cv2
+except Exception:
+    cv2 = None
+
+try:
+    from skimage.metrics import structural_similarity as ssim
+except Exception:
+    ssim = None
 
 try:
     import pyautogui
@@ -66,7 +74,8 @@ class Client():
     def is_supported_environment(cls):
         return _env_flag(
             "ACU_ENABLE_UI_AUTOMATION",
-            IS_WINDOWS and HAS_DISPLAY and pyautogui is not None and ImageGrab is not None and screeninfo is not None,
+            IS_WINDOWS and HAS_DISPLAY and pyautogui is not None and ImageGrab is not None
+            and screeninfo is not None and cv2 is not None and ssim is not None,
         )
 
     def findScreen(self):
@@ -106,6 +115,8 @@ class Client():
             self.screen_type = 0
 
     def compare_Port(self, curPath, refPath):
+        if cv2 is None or ssim is None:
+            raise RuntimeError("OpenCV or scikit-image is unavailable in this environment")
         image1 = cv2.imread(curPath)
         image2 = cv2.imread(refPath)
         # Convert images to grayscale
@@ -131,6 +142,8 @@ class Client():
         pyautogui.click(self.close_Yabe)
         
     def compare_images(self):
+        if cv2 is None or ssim is None:
+            raise RuntimeError("OpenCV or scikit-image is unavailable in this environment")
         image1 = cv2.imread(self.reference_path)
         image2 = cv2.imread(self.test_path)
         # Convert images to grayscale

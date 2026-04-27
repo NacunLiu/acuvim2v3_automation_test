@@ -1280,9 +1280,19 @@ if __name__ == '__main__':
     portList = serial_ports()
     plugMap = targetIp
     plugList = list(targetIp.keys())
+    default_port = 'COM6'
+    default_plug = 2
 
     portOrder = []
     plugOrder = []
+
+    if (default_port in portList and default_plug in plugList):
+        logger.info('Default setup detected. Using %s with plug %s', default_port, default_plug)
+        portOrder.append(default_port)
+        plugOrder.append(default_plug)
+        portList.remove(default_port)
+        plugList.remove(default_plug)
+        continueAdding = False
 
     while (continueAdding and portList):
         print('Available ports:', portList, 'available plug:', plugList)
