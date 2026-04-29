@@ -7,13 +7,15 @@ from pywinauto import Application, Desktop
 from pywinauto.findwindows import ElementNotFoundError
 
 
-EXE_PATH = (
+EXE_PATH = os.environ.get(
+    "USPROGRAM_EXE_PATH",
     r"C:\Users\NacunLiu\Nacun_Work\test apps install package"
-    r"\Acuvim-II v3 USProgram English\Acuvim-II v3 USProgram English\USProgram.exe"
+    r"\Acuvim-II v3 USProgram English\Acuvim-II v3 USProgram English\USProgram.exe",
 )
+FIRMWARE_DIR = os.environ.get("FIRMWARE_DIR", str(Path.home() / "Downloads"))
 MAIN_WINDOW_TITLE_RE = r".*S-Programmer.*"
 COMMUNICATIONS_TITLE = "Communications"
-COM_PORT_VALUE = "COM6"
+COM_PORT_VALUE = os.environ.get("ACU_WIN_COM_PORT", "COM6")
 BAUD_RATE_VALUE = "115200"
 OPEN_DIALOG_TITLE = "Open"
 REQUEST_DIALOG_TITLE_RE = r".*Request.*"
@@ -95,11 +97,17 @@ def find_combo_by_item(dialog, expected_item):
 
 
 def get_latest_firmware_file():
-    downloads_dir = Path.home() / "Downloads"
-    abin_files = [path for path in downloads_dir.iterdir() if path.is_file() and path.suffix.lower() == ".abin"]
-    if not abin_files:
-        raise FileNotFoundError(f"Could not find any .abin files in {downloads_dir}")
-    return max(abin_files, key=lambda path: path.stat().st_mtime)
+    firmware_dir = Path(FIRMWARE_DIR)
+    candidates = [p for p in firmware_dir.iterdir()
+                  if p.is_file() and p.name.upper().startswith("AHB")]
+    if not candidates:
+        candidates = [p for p in firmware_dir.iterdir()
+                      if p.is_file() and p.suffix.lower() == ".abin"]
+    if not candidates:
+        raise FileNotFoundError(
+            f"Could not find any AHB* firmware files in {firmware_dir}"
+        )
+    return max(candidates, key=lambda p: p.stat().st_mtime)
 
 
 def configure_communications(process_id):

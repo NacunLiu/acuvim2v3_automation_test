@@ -43,6 +43,7 @@ def env_flag(name, default):
 
 BROWSER_ENABLED = env_flag("ACU_ENABLE_BROWSER", HAS_DISPLAY and not RUNNING_IN_CONTAINER)
 MANUAL_POWER_MODE = env_flag("ACU_MANUAL_POWER", False)
+BATCH_MODE = env_flag("ACU_BATCH_MODE", False)
 
 
 def normalize_port_input(raw_value, available_ports):
@@ -1334,7 +1335,20 @@ if __name__ == '__main__':
     portOrder = []
     plugOrder = []
 
-    if MANUAL_POWER_MODE and default_port in portList:
+    CI_PORT = os.environ.get("ACU_PORT", "").strip()
+    CI_PLUG_ID = os.environ.get("ACU_PLUG_ID", "").strip()
+
+    if BATCH_MODE and CI_PORT:
+        if CI_PORT in portList:
+            portOrder.append(CI_PORT)
+            if not MANUAL_POWER_MODE and CI_PLUG_ID:
+                plugOrder.append(int(CI_PLUG_ID))
+            continueAdding = False
+            logger.info('Batch mode: port=%s plug=%s', CI_PORT, CI_PLUG_ID or 'N/A (manual power)')
+        else:
+            logger.error('ACU_PORT=%s not found in detected ports: %s. Check USB adapter is attached.', CI_PORT, portList)
+            raise SystemExit(1)
+    elif MANUAL_POWER_MODE and default_port in portList:
         logger.info('Default setup detected. Using %s in manual power mode', default_port)
         portOrder.append(default_port)
         continueAdding = False
@@ -1412,7 +1426,9 @@ if __name__ == '__main__':
     logger.info("Gen. tests finished, runtime: {} minutes {} seconds" \
                 .format(int(runtime // 60), int(runtime % 60)))
 
-    Web2Test = input('Press Enter to continue WEB Push Test ')
+    if not BATCH_MODE:
+        input('Press Enter to continue WEB Push Test ')
+
     start_time2 = time.time()
     shared_failCount = multiprocessing.Value('i', 0)
     openbrowserlock = multiprocessing.Lock()
