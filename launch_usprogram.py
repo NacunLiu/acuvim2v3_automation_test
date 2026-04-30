@@ -216,14 +216,23 @@ def wait_for_programming_complete(process_id):
 
     for attempt in range(1, PROGRAMMING_MAX_RETRIES + 1):
         try:
-            app = Application(backend="win32").connect(process=process_id, timeout=5)
-            dialog = app.window(title_re=r".*[Pp]rogramm.*[Ff]inish.*|.*[Ff]inish.*")
-            if dialog.exists():
-                dialog.wait("visible ready", timeout=5)
-                ok_button = dialog.child_window(title="OK", class_name="TButton")
-                ok_button.click()
-                print("Firmware programming completed. Clicked OK.")
-                return
+            desktop = Desktop(backend="win32")
+            for title in ["Programming finished", "Information", "Message"]:
+                try:
+                    dialog = desktop.window(title=title, process=process_id)
+                    if dialog.exists():
+                        dialog.wait("visible ready", timeout=3)
+                        for btn_class in ["Button", "TButton"]:
+                            try:
+                                ok_button = dialog.child_window(title="OK", class_name=btn_class)
+                                if ok_button.exists():
+                                    ok_button.click()
+                                    print("Firmware programming completed. Clicked OK.")
+                                    return
+                            except Exception:
+                                continue
+                except Exception:
+                    continue
         except Exception:
             pass
 
