@@ -309,6 +309,8 @@ def main():
     import_latest_firmware(process.pid)
     request_meter(process.pid)
     start_download(process.pid)
+    wait_for_programming_complete(process.pid)
+    process.terminate()
 
 
 if __name__ == "__main__":

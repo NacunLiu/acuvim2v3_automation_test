@@ -48,27 +48,24 @@ pipeline {
                 echo "Running firmware update via USProgram..."
                 bat 'python launch_usprogram.py'
 
-                echo "Sharing USB serial adapter (COM6) via usbipd for WSL to attach..."
+                echo "Handing USB serial adapter to WSL via usbipd attach --wsl..."
                 powershell '''
-                    $shared = $false
                     $candidates = usbipd list | Select-String -Pattern "0403:6001"
+                    $found = $false
                     foreach ($line in $candidates) {
                         $busid = ($line.ToString().Trim() -split " ")[0]
                         Write-Host "Binding bus ID $busid..."
-                        usbipd bind --busid $busid --force 2>$null
-                        Start-Sleep 3
-                        $com_gone = -not (Get-WmiObject Win32_SerialPort | Where-Object { $_.DeviceID -match "COM" -and $_.Name -match "USB" })
-                        if ($com_gone) {
-                            Write-Host "Bus ID $busid bound and shared — WSL will attach via usbip"
-                            $shared = $true
-                            break
-                        }
-                        Write-Host "Bus ID $busid bind may not have removed COM port, continuing..."
-                        $shared = $true
+                        usbipd bind --busid $busid --force
+                        Start-Sleep 2
+                        Write-Host "Attaching bus ID $busid to Ubuntu-22.04..."
+                        $result = usbipd attach --wsl --distribution Ubuntu-22.04 --busid $busid 2>&1
+                        Write-Host "usbipd attach output: $result"
+                        Start-Sleep 5
+                        $found = $true
                         break
                     }
-                    if (-not $shared) {
-                        Write-Host "WARNING: No FTDI device (0403:6001) found to share"
+                    if (-not $found) {
+                        Write-Host "WARNING: No FTDI device (0403:6001) found to attach"
                     }
                     exit 0
                 '''
@@ -87,26 +84,12 @@ pipeline {
             agent { label 'built-in' }
 
             steps {
-                echo "Attaching USB serial adapter from Windows usbipd into WSL..."
+                echo "Verifying USB serial adapter in WSL (attached by usbipd during Stage 1)..."
                 sh '''
-                    sleep 5
-                    echo "Shared devices on Windows usbipd:"
-                    sudo /usr/local/bin/usbip list -r 127.0.0.1 2>&1 || true
-
-                    BUSID=$(sudo /usr/local/bin/usbip list -r 127.0.0.1 2>/dev/null \
-                        | grep -i "0403:6001" \
-                        | awk \'{print $1}\' | tr -d \':\')
-
-                    if [ -z "$BUSID" ]; then
-                        echo "ERROR: FTDI device (0403:6001) not found in usbipd export list"
-                        exit 1
-                    fi
-                    echo "Attaching bus ID $BUSID..."
-                    sudo /usr/local/bin/usbip attach -r 127.0.0.1 -b "$BUSID"
-                    sleep 5
+                    sleep 10
                     echo "dmesg USB events:"
                     dmesg | grep -iE "usb|ttyUSB|ftdi" | tail -15 || true
-                    ls /dev/ttyUSB* || (echo "ERROR: No USB serial adapter found in WSL after attach." && exit 1)
+                    ls /dev/ttyUSB* || (echo "ERROR: No USB serial adapter found in WSL." && exit 1)
                     echo "USB serial adapter ready: $(ls /dev/ttyUSB*)"
                 '''
 
