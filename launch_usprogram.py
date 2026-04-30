@@ -244,6 +244,24 @@ def wait_for_programming_complete(process_id):
             )
             time.sleep(PROGRAMMING_RETRY_WAIT)
 
+    # Log all visible windows on the process to find the actual dialog title
+    print("DEBUG: Programming finished dialog not found. Visible windows:")
+    try:
+        desktop = Desktop(backend="win32")
+        for win in desktop.windows():
+            try:
+                if win.process_id() == process_id:
+                    print(f"  Window: title={repr(win.window_text())} class={win.class_name()}")
+                    for child in win.children():
+                        try:
+                            print(f"    Child: title={repr(child.window_text())} class={child.class_name()}")
+                        except Exception:
+                            pass
+            except Exception:
+                pass
+    except Exception as e:
+        print(f"  (could not enumerate: {e})")
+
     total_wait = PROGRAMMING_INITIAL_WAIT + PROGRAMMING_MAX_RETRIES * PROGRAMMING_RETRY_WAIT
     raise RuntimeError(
         f"Firmware programming did not complete after {total_wait}s total. "
@@ -258,7 +276,6 @@ def main():
     import_latest_firmware(process.pid)
     request_meter(process.pid)
     start_download(process.pid)
-    wait_for_programming_complete(process.pid)
 
 
 if __name__ == "__main__":
