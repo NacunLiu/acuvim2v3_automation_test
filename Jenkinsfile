@@ -42,8 +42,8 @@ pipeline {
                         $busid = ($line.ToString().Trim() -split " ")[0]
                         Write-Host "Trying bus ID $busid..."
                         usbipd bind --busid $busid --force 2>$null
-                        usbipd attach --wsl --busid $busid 2>$null
-                        Start-Sleep 2
+                        usbipd attach --wsl --distribution Ubuntu-22.04 --busid $busid 2>$null
+                        Start-Sleep 5
                         $com6_gone = -not (Get-WmiObject Win32_SerialPort | Where-Object { $_.DeviceID -eq "COM6" })
                         if ($com6_gone) {
                             Write-Host "COM6 device successfully attached to WSL via bus ID $busid"
