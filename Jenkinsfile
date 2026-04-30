@@ -33,9 +33,10 @@ pipeline {
                     usbipd list | Select-String "0403:6001" | ForEach-Object {
                         $busid = ($_.ToString().Trim() -split " ")[0]
                         usbipd detach --busid $busid 2>$null
-                        Write-Host "Detached bus ID $busid from WSL"
+                        usbipd unbind --busid $busid 2>$null
+                        Write-Host "Released bus ID $busid back to Windows"
                     }
-                    Start-Sleep 3
+                    Start-Sleep 8
                     exit 0
                 '''
 
