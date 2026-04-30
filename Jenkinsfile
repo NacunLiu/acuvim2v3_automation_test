@@ -33,10 +33,11 @@ pipeline {
                     usbipd list | Select-String "0403:6001" | ForEach-Object {
                         $busid = ($_.ToString().Trim() -split " ")[0]
                         usbipd detach --busid $busid 2>$null
-                        usbipd unbind --busid $busid 2>$null
-                        Write-Host "Released bus ID $busid back to Windows"
+                        Write-Host "Detached bus ID $busid — waiting for Windows to re-enumerate COM port..."
                     }
-                    Start-Sleep 8
+                    Start-Sleep 10
+                    Write-Host "Available serial ports after detach:"
+                    Get-WmiObject Win32_SerialPort | Select-Object DeviceID, Name | Format-Table
                     exit 0
                 '''
 
@@ -53,7 +54,6 @@ pipeline {
                     foreach ($line in $candidates) {
                         $busid = ($line.ToString().Trim() -split " ")[0]
                         Write-Host "Trying bus ID $busid..."
-                        usbipd bind --busid $busid --force
                         usbipd attach --wsl --distribution Ubuntu-22.04 --busid $busid
                         Start-Sleep 5
                         $com6_gone = -not (Get-WmiObject Win32_SerialPort | Where-Object { $_.DeviceID -eq "COM6" })
