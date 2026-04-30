@@ -54,7 +54,7 @@ pipeline {
                     foreach ($line in $candidates) {
                         $busid = ($line.ToString().Trim() -split " ")[0]
                         Write-Host "Trying bus ID $busid..."
-                        usbipd attach --wsl --distribution Ubuntu-22.04 --busid $busid
+                        usbipd attach --wsl --busid $busid
                         Start-Sleep 5
                         $com6_gone = -not (Get-WmiObject Win32_SerialPort | Where-Object { $_.DeviceID -eq "COM6" })
                         if ($com6_gone) {
