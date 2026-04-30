@@ -28,6 +28,17 @@ pipeline {
             }
 
             steps {
+                echo "Returning USB serial adapter to Windows if previously attached to WSL..."
+                powershell '''
+                    usbipd list | Select-String "0403:6001" | ForEach-Object {
+                        $busid = ($_.ToString().Trim() -split " ")[0]
+                        usbipd detach --busid $busid 2>$null
+                        Write-Host "Detached bus ID $busid from WSL"
+                    }
+                    Start-Sleep 3
+                    exit 0
+                '''
+
                 echo "Installing Windows Python dependencies..."
                 bat 'pip install pywinauto --quiet --disable-pip-version-check'
 
