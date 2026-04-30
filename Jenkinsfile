@@ -33,6 +33,21 @@ pipeline {
 
                 echo "Running firmware update via USProgram..."
                 bat 'python launch_usprogram.py'
+
+                echo "Handing USB serial adapter from Windows to WSL via usbipd..."
+                powershell '''
+                    Write-Host "--- usbipd list ---"
+                    usbipd list
+                    $device = usbipd list | Select-String -Pattern "COM6"
+                    if ($device) {
+                        $busid = ($device.ToString().Trim() -split "\\s+")[0]
+                        Write-Host "Found COM6 device at bus ID $busid, attaching to WSL..."
+                        usbipd attach --wsl --busid $busid
+                        Write-Host "Attached."
+                    } else {
+                        Write-Host "WARNING: Could not find COM6 device in usbipd list. WSL may need manual USB attachment."
+                    }
+                '''
             }
 
             post {
@@ -48,22 +63,7 @@ pipeline {
             agent { label 'built-in' }
 
             steps {
-                echo "Attaching USB serial adapter from Windows to WSL via usbipd..."
-                sh '''
-                    BUSID=$(powershell.exe -Command \
-                        "usbipd list" 2>/dev/null \
-                        | grep -iE "CP210|CH340|FTDI|USB Serial|USB-SERIAL" \
-                        | awk "{print \\$1}" | head -1 || true)
-                    if [ -n "$BUSID" ]; then
-                        echo "Attaching USB bus ID $BUSID to WSL..."
-                        powershell.exe -Command "usbipd attach --wsl --busid $BUSID" || true
-                        sleep 3
-                    else
-                        echo "usbipd not available or device not found — assuming /dev/ttyUSB0 is already attached."
-                    fi
-                '''
-
-                echo "Verifying serial port is visible..."
+                echo "Verifying USB serial adapter is visible in WSL..."
                 sh 'ls /dev/ttyUSB* || (echo "ERROR: No USB serial adapter found in WSL. See scripts/setup_wsl_env.sh." && exit 1)'
 
                 echo "Setting up Python virtual environment..."
