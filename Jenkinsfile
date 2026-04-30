@@ -48,6 +48,9 @@ pipeline {
                 echo "Running firmware update via USProgram..."
                 bat 'python launch_usprogram.py'
 
+                echo "Firmware update triggered — waiting 5 minutes for USProgram to complete flashing. Windows node stays alive; Linux stage will not start until this wait finishes."
+                powershell 'Start-Sleep -Seconds 300'
+
                 echo "Handing USB serial adapter to WSL via usbipd attach --wsl..."
                 powershell '''
                     $candidates = usbipd list | Select-String -Pattern "0403:6001"
