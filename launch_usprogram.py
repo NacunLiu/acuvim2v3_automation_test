@@ -193,14 +193,29 @@ def start_download(process_id):
     download_button.click()
     pause()
 
-    confirm_dialog = wait_for_desktop_window(
-        backend="win32",
-        process_id=process_id,
-        title_re=r".*[Cc]onfirm.*|.*[Ww]arning.*|.*[Pp]rogramm.*",
-        timeout=10,
-    )
-    yes_button = confirm_dialog.child_window(title="Yes", class_name="TButton")
-    yes_button.click()
+    # Find whichever dialog appeared with a Yes button — title varies by locale/version
+    deadline = time.time() + 10
+    confirmed = False
+    while time.time() < deadline:
+        try:
+            for win in app.windows():
+                try:
+                    yes_btn = win.child_window(title="Yes", class_name="TButton")
+                    if yes_btn.exists():
+                        yes_btn.click()
+                        confirmed = True
+                        break
+                except Exception:
+                    continue
+        except Exception:
+            pass
+        if confirmed:
+            break
+        time.sleep(0.5)
+
+    if not confirmed:
+        raise TimeoutError("Could not find the programming confirmation dialog (Yes button not found)")
+
     pause()
     print("Confirmed programming start. Firmware download in progress...")
 
