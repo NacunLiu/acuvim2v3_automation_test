@@ -192,7 +192,17 @@ def start_download(process_id):
 
     download_button.click()
     pause()
-    print("Started firmware download")
+
+    confirm_dialog = wait_for_desktop_window(
+        backend="win32",
+        process_id=process_id,
+        title_re=r".*[Cc]onfirm.*|.*[Ww]arning.*|.*[Pp]rogramm.*",
+        timeout=10,
+    )
+    yes_button = confirm_dialog.child_window(title="Yes", class_name="TButton")
+    yes_button.click()
+    pause()
+    print("Confirmed programming start. Firmware download in progress...")
 
 
 PROGRAMMING_INITIAL_WAIT = 300  # 5 minutes for firmware flash
