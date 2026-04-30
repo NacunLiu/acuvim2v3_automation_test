@@ -48,30 +48,27 @@ pipeline {
                 echo "Running firmware update via USProgram..."
                 bat 'python launch_usprogram.py'
 
-                echo "Handing USB serial adapter (COM6) from Windows to WSL via usbipd..."
+                echo "Sharing USB serial adapter (COM6) via usbipd for WSL to attach..."
                 powershell '''
-                    $attached = $false
+                    $shared = $false
                     $candidates = usbipd list | Select-String -Pattern "0403:6001"
                     foreach ($line in $candidates) {
                         $busid = ($line.ToString().Trim() -split " ")[0]
-                        Write-Host "Trying bus ID $busid..."
+                        Write-Host "Binding bus ID $busid..."
                         usbipd bind --busid $busid --force 2>$null
-                        Start-Sleep 2
-                        usbipd attach --wsl --busid $busid 2>$null
-                        Start-Sleep 5
-                        $com6_gone = -not (Get-WmiObject Win32_SerialPort | Where-Object { $_.DeviceID -eq "COM6" })
-                        if ($com6_gone) {
-                            Write-Host "COM6 device successfully attached to WSL via bus ID $busid"
-                            $attached = $true
+                        Start-Sleep 3
+                        $com_gone = -not (Get-WmiObject Win32_SerialPort | Where-Object { $_.DeviceID -match "COM" -and $_.Name -match "USB" })
+                        if ($com_gone) {
+                            Write-Host "Bus ID $busid bound and shared — WSL will attach via usbip"
+                            $shared = $true
                             break
                         }
-                        Write-Host "Bus ID $busid was not COM6, releasing..."
-                        usbipd detach --busid $busid 2>$null
-                        usbipd unbind --busid $busid 2>$null
-                        Start-Sleep 3
+                        Write-Host "Bus ID $busid bind may not have removed COM port, continuing..."
+                        $shared = $true
+                        break
                     }
-                    if (-not $attached) {
-                        Write-Host "WARNING: Could not identify and attach COM6 device to WSL"
+                    if (-not $shared) {
+                        Write-Host "WARNING: No FTDI device (0403:6001) found to share"
                     }
                     exit 0
                 '''
@@ -90,12 +87,27 @@ pipeline {
             agent { label 'built-in' }
 
             steps {
-                echo "Waiting for USB device to enumerate in WSL..."
+                echo "Attaching USB serial adapter from Windows usbipd into WSL..."
                 sh '''
-                    sleep 15
+                    sleep 5
+                    echo "Shared devices on Windows usbipd:"
+                    sudo /usr/local/bin/usbip list -r 127.0.0.1 2>&1 || true
+
+                    BUSID=$(sudo /usr/local/bin/usbip list -r 127.0.0.1 2>/dev/null \
+                        | grep -i "0403:6001" \
+                        | awk \'{print $1}\' | tr -d \':\')
+
+                    if [ -z "$BUSID" ]; then
+                        echo "ERROR: FTDI device (0403:6001) not found in usbipd export list"
+                        exit 1
+                    fi
+                    echo "Attaching bus ID $BUSID..."
+                    sudo /usr/local/bin/usbip attach -r 127.0.0.1 -b "$BUSID"
+                    sleep 5
                     echo "dmesg USB events:"
-                    dmesg | grep -iE "usb|ttyUSB|ftdi" | tail -10 || true
-                    ls /dev/ttyUSB* || (echo "ERROR: No USB serial adapter found in WSL. See scripts/setup_wsl_env.sh." && exit 1)
+                    dmesg | grep -iE "usb|ttyUSB|ftdi" | tail -15 || true
+                    ls /dev/ttyUSB* || (echo "ERROR: No USB serial adapter found in WSL after attach." && exit 1)
+                    echo "USB serial adapter ready: $(ls /dev/ttyUSB*)"
                 '''
 
                 echo "Setting up Python virtual environment..."
