@@ -85,8 +85,13 @@ pipeline {
             agent { label 'built-in' }
 
             steps {
-                echo "Verifying USB serial adapter is visible in WSL..."
-                sh 'ls /dev/ttyUSB* || (echo "ERROR: No USB serial adapter found in WSL. See scripts/setup_wsl_env.sh." && exit 1)'
+                echo "Waiting for USB device to enumerate in WSL..."
+                sh '''
+                    sleep 15
+                    echo "dmesg USB events:"
+                    dmesg | grep -iE "usb|ttyUSB|ftdi" | tail -10 || true
+                    ls /dev/ttyUSB* || (echo "ERROR: No USB serial adapter found in WSL. See scripts/setup_wsl_env.sh." && exit 1)
+                '''
 
                 echo "Setting up Python virtual environment..."
                 sh '''
