@@ -35,7 +35,7 @@ def pause():
     time.sleep(ACTION_DELAY_SECONDS)
 
 
-def wait_for_window(app, title_re=None, title=None, timeout=15):
+def wait_for_window(app, title_re=None, title=None, timeout=30):
     deadline = time.time() + timeout
     while time.time() < deadline:
         try:
@@ -281,6 +281,7 @@ def main():
     process = launch_app()
     time.sleep(2)
     configure_communications(process.pid)
+    time.sleep(6)  # Wait for USProgram to connect to meter after communications configured
     import_latest_firmware(process.pid)
     request_meter(process.pid)
     start_download(process.pid)
