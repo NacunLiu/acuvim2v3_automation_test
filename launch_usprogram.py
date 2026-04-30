@@ -114,37 +114,42 @@ def configure_communications(process_id):
     app = Application(backend="win32").connect(process=process_id, timeout=15)
     dialog = wait_for_window(app, title=COMMUNICATIONS_TITLE)
 
-    # Try the configured port first; fall back to the first available COM port
-    try:
-        com_port_combo = find_combo_by_item(dialog, COM_PORT_VALUE)
-        port_to_use = COM_PORT_VALUE
-    except RuntimeError:
-        port_to_use = None
+    # Detect COM port and baud rate combos in a single pass (no slow polling)
+    com_port_combo = baud_rate_combo = port_to_use = None
+    deadline = time.time() + 15
+    while time.time() < deadline and (com_port_combo is None or baud_rate_combo is None):
         for combo in dialog.children(class_name="TComboBox"):
             try:
                 items = combo.item_texts()
-                com_ports = [i for i in items if i.startswith("COM")]
-                if com_ports:
-                    port_to_use = com_ports[0]
+                if COM_PORT_VALUE in items and com_port_combo is None:
                     com_port_combo = combo
-                    print(f"Warning: {COM_PORT_VALUE} not found, using {port_to_use}")
-                    break
+                    port_to_use = COM_PORT_VALUE
+                elif com_ports := [i for i in items if i.startswith("COM")]:
+                    if com_port_combo is None:
+                        com_port_combo = combo
+                        port_to_use = com_ports[0]
+                        print(f"Warning: {COM_PORT_VALUE} not found, using {port_to_use}")
+                if BAUD_RATE_VALUE in items and baud_rate_combo is None:
+                    baud_rate_combo = combo
             except Exception:
                 continue
-        if port_to_use is None:
-            raise RuntimeError(f"Could not find {COM_PORT_VALUE} or any COM port in Communications dialog")
+        if com_port_combo is None or baud_rate_combo is None:
+            time.sleep(0.5)
+
+    if com_port_combo is None:
+        raise RuntimeError(f"Could not find COM port combo in Communications dialog")
+    if baud_rate_combo is None:
+        raise RuntimeError(f"Could not find baud rate combo in Communications dialog")
 
     com_port_combo.select(port_to_use)
     pause()
-
-    baud_rate_combo = find_combo_by_item(dialog, BAUD_RATE_VALUE)
     baud_rate_combo.select(BAUD_RATE_VALUE)
     pause()
 
     ok_button = dialog.child_window(title="OK", class_name="TButton")
     ok_button.click()
     pause()
-    print(f"Configured communications: {COM_PORT_VALUE}, {BAUD_RATE_VALUE}")
+    print(f"Configured communications: {port_to_use}, {BAUD_RATE_VALUE}")
 
 
 def import_latest_firmware(process_id):
