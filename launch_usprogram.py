@@ -114,8 +114,27 @@ def configure_communications(process_id):
     app = Application(backend="win32").connect(process=process_id, timeout=15)
     dialog = wait_for_window(app, title=COMMUNICATIONS_TITLE)
 
-    com_port_combo = find_combo_by_item(dialog, COM_PORT_VALUE)
-    com_port_combo.select(COM_PORT_VALUE)
+    # Try the configured port first; fall back to the first available COM port
+    try:
+        com_port_combo = find_combo_by_item(dialog, COM_PORT_VALUE)
+        port_to_use = COM_PORT_VALUE
+    except RuntimeError:
+        port_to_use = None
+        for combo in dialog.children(class_name="TComboBox"):
+            try:
+                items = combo.item_texts()
+                com_ports = [i for i in items if i.startswith("COM")]
+                if com_ports:
+                    port_to_use = com_ports[0]
+                    com_port_combo = combo
+                    print(f"Warning: {COM_PORT_VALUE} not found, using {port_to_use}")
+                    break
+            except Exception:
+                continue
+        if port_to_use is None:
+            raise RuntimeError(f"Could not find {COM_PORT_VALUE} or any COM port in Communications dialog")
+
+    com_port_combo.select(port_to_use)
     pause()
 
     baud_rate_combo = find_combo_by_item(dialog, BAUD_RATE_VALUE)
