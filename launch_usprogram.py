@@ -237,70 +237,6 @@ def start_download(process_id):
     print("Confirmed programming start. Firmware download in progress...")
 
 
-PROGRAMMING_INITIAL_WAIT = 300  # 5 minutes for firmware flash
-PROGRAMMING_RETRY_WAIT   = 30
-PROGRAMMING_MAX_RETRIES  = 5
-
-
-def wait_for_programming_complete(process_id):
-    print(f"Waiting {PROGRAMMING_INITIAL_WAIT}s for firmware programming to complete...")
-    time.sleep(PROGRAMMING_INITIAL_WAIT)
-
-    for attempt in range(1, PROGRAMMING_MAX_RETRIES + 1):
-        try:
-            desktop = Desktop(backend="win32")
-            for title in ["Programming finished", "Information", "Message"]:
-                try:
-                    dialog = desktop.window(title=title, process=process_id)
-                    if dialog.exists():
-                        dialog.wait("visible ready", timeout=3)
-                        for btn_class in ["Button", "TButton"]:
-                            try:
-                                ok_button = dialog.child_window(title="OK", class_name=btn_class)
-                                if ok_button.exists():
-                                    ok_button.click()
-                                    print("Firmware programming completed. Clicked OK.")
-                                    return
-                            except Exception:
-                                continue
-                except Exception:
-                    continue
-        except Exception:
-            pass
-
-        if attempt < PROGRAMMING_MAX_RETRIES:
-            print(
-                f"'Programming finished' dialog not found "
-                f"(attempt {attempt}/{PROGRAMMING_MAX_RETRIES}). "
-                f"Waiting {PROGRAMMING_RETRY_WAIT}s before retry..."
-            )
-            time.sleep(PROGRAMMING_RETRY_WAIT)
-
-    # Log all visible windows on the process to find the actual dialog title
-    print("DEBUG: Programming finished dialog not found. Visible windows:")
-    try:
-        desktop = Desktop(backend="win32")
-        for win in desktop.windows():
-            try:
-                if win.process_id() == process_id:
-                    print(f"  Window: title={repr(win.window_text())} class={win.class_name()}")
-                    for child in win.children():
-                        try:
-                            print(f"    Child: title={repr(child.window_text())} class={child.class_name()}")
-                        except Exception:
-                            pass
-            except Exception:
-                pass
-    except Exception as e:
-        print(f"  (could not enumerate: {e})")
-
-    total_wait = PROGRAMMING_INITIAL_WAIT + PROGRAMMING_MAX_RETRIES * PROGRAMMING_RETRY_WAIT
-    raise RuntimeError(
-        f"Firmware programming did not complete after {total_wait}s total. "
-        "Update failed — check meter connection and USProgram."
-    )
-
-
 def main():
     process = launch_app()
     time.sleep(2)
@@ -309,8 +245,7 @@ def main():
     import_latest_firmware(process.pid)
     request_meter(process.pid)
     start_download(process.pid)
-    wait_for_programming_complete(process.pid)
-    process.terminate()
+    print("Firmware download started. Returning control to Jenkins — USProgram left running.")
 
 
 if __name__ == "__main__":
