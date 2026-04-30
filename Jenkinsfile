@@ -136,7 +136,7 @@ pipeline {
                     )
                 ]) {
                     sh """
-                        "${WORKSPACE}/venv/bin/python" \
+                        python3 \
                             "${WORKSPACE}/scripts/send_report.py" \
                             "${currentBuild.result ?: 'SUCCESS'}" \
                             "${env.BUILD_NUMBER}" \

@@ -123,7 +123,7 @@ def configure_communications(process_id):
     pause()
 
     ok_button = dialog.child_window(title="OK", class_name="TButton")
-    ok_button.click_input()
+    ok_button.click()
     pause()
     print(f"Configured communications: {COM_PORT_VALUE}, {BAUD_RATE_VALUE}")
 
@@ -156,7 +156,7 @@ def import_latest_firmware(process_id):
     pause()
 
     open_button = open_dialog.child_window(title="Open", auto_id="1", control_type="Button")
-    open_button.click_input()
+    open_button.invoke()
     pause()
     print(f"Imported firmware: {firmware_path}")
 
