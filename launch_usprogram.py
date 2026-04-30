@@ -195,6 +195,43 @@ def start_download(process_id):
     print("Started firmware download")
 
 
+PROGRAMMING_INITIAL_WAIT = 300  # 5 minutes for firmware flash
+PROGRAMMING_RETRY_WAIT   = 30
+PROGRAMMING_MAX_RETRIES  = 5
+
+
+def wait_for_programming_complete(process_id):
+    print(f"Waiting {PROGRAMMING_INITIAL_WAIT}s for firmware programming to complete...")
+    time.sleep(PROGRAMMING_INITIAL_WAIT)
+
+    for attempt in range(1, PROGRAMMING_MAX_RETRIES + 1):
+        try:
+            app = Application(backend="win32").connect(process=process_id, timeout=5)
+            dialog = app.window(title_re=r".*[Pp]rogramm.*[Ff]inish.*|.*[Ff]inish.*")
+            if dialog.exists():
+                dialog.wait("visible ready", timeout=5)
+                ok_button = dialog.child_window(title="OK", class_name="TButton")
+                ok_button.click()
+                print("Firmware programming completed. Clicked OK.")
+                return
+        except Exception:
+            pass
+
+        if attempt < PROGRAMMING_MAX_RETRIES:
+            print(
+                f"'Programming finished' dialog not found "
+                f"(attempt {attempt}/{PROGRAMMING_MAX_RETRIES}). "
+                f"Waiting {PROGRAMMING_RETRY_WAIT}s before retry..."
+            )
+            time.sleep(PROGRAMMING_RETRY_WAIT)
+
+    total_wait = PROGRAMMING_INITIAL_WAIT + PROGRAMMING_MAX_RETRIES * PROGRAMMING_RETRY_WAIT
+    raise RuntimeError(
+        f"Firmware programming did not complete after {total_wait}s total. "
+        "Update failed — check meter connection and USProgram."
+    )
+
+
 def main():
     process = launch_app()
     time.sleep(2)
@@ -202,6 +239,7 @@ def main():
     import_latest_firmware(process.pid)
     request_meter(process.pid)
     start_download(process.pid)
+    wait_for_programming_complete(process.pid)
 
 
 if __name__ == "__main__":

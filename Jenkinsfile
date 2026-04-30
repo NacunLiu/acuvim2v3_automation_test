@@ -33,9 +33,6 @@ pipeline {
 
                 echo "Running firmware update via USProgram..."
                 bat 'python launch_usprogram.py'
-
-                echo "Waiting 90 s for meter to reboot after firmware flash..."
-                sleep time: 90, unit: 'SECONDS'
             }
 
             post {
