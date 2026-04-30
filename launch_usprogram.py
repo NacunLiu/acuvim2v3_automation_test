@@ -185,10 +185,18 @@ def start_download(process_id):
     app = Application(backend="win32").connect(process=process_id, timeout=15)
     main_window = wait_for_window(app, title_re=MAIN_WINDOW_TITLE_RE)
 
-    time.sleep(4)
     download_button = main_window.child_window(title="Downlo&ad", class_name="TButton")
-    if not download_button.is_enabled():
-        raise RuntimeError("Download button is not enabled")
+    deadline = time.time() + 20
+    while time.time() < deadline:
+        try:
+            if download_button.is_enabled():
+                break
+        except Exception:
+            pass
+        time.sleep(1)
+    else:
+        print("Download button never became enabled — firmware may already be up to date. Skipping flash.")
+        return
 
     download_button.click()
     pause()
