@@ -56,6 +56,7 @@ pipeline {
                     if (-not $attached) {
                         Write-Host "WARNING: Could not identify and attach COM6 device to WSL"
                     }
+                    exit 0
                 '''
             }
 
