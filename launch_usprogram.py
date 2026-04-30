@@ -193,17 +193,26 @@ def start_download(process_id):
     download_button.click()
     pause()
 
-    # Find whichever dialog appeared with a Yes button — title varies by locale/version
+    # Find whichever dialog appeared with a Yes button — title/class varies by version
     deadline = time.time() + 10
     confirmed = False
     while time.time() < deadline:
         try:
             for win in app.windows():
                 try:
-                    yes_btn = win.child_window(title="Yes", class_name="TButton")
-                    if yes_btn.exists():
-                        yes_btn.click()
-                        confirmed = True
+                    for btn_title in ["Yes", "&Yes"]:
+                        for btn_class in ["TButton", "TBitBtn", "Button"]:
+                            try:
+                                yes_btn = win.child_window(title=btn_title, class_name=btn_class)
+                                if yes_btn.exists():
+                                    yes_btn.click()
+                                    confirmed = True
+                                    break
+                            except Exception:
+                                continue
+                        if confirmed:
+                            break
+                    if confirmed:
                         break
                 except Exception:
                     continue
@@ -214,6 +223,18 @@ def start_download(process_id):
         time.sleep(0.5)
 
     if not confirmed:
+        # Log all visible windows and children to help diagnose the title/class
+        print("DEBUG: Could not find Yes button. Visible windows:")
+        try:
+            for win in app.windows():
+                print(f"  Window: title={repr(win.window_text())} class={win.class_name()}")
+                for child in win.children():
+                    try:
+                        print(f"    Child: title={repr(child.window_text())} class={child.class_name()}")
+                    except Exception:
+                        pass
+        except Exception as e:
+            print(f"  (could not enumerate windows: {e})")
         raise TimeoutError("Could not find the programming confirmation dialog (Yes button not found)")
 
     pause()
