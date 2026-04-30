@@ -34,18 +34,27 @@ pipeline {
                 echo "Running firmware update via USProgram..."
                 bat 'python launch_usprogram.py'
 
-                echo "Handing USB serial adapter from Windows to WSL via usbipd..."
+                echo "Handing USB serial adapter (COM6) from Windows to WSL via usbipd..."
                 powershell '''
-                    Write-Host "--- usbipd list ---"
-                    usbipd list
-                    $device = usbipd list | Select-String -Pattern "COM6"
-                    if ($device) {
-                        $busid = ($device.ToString().Trim() -split "\\s+")[0]
-                        Write-Host "Found COM6 device at bus ID $busid, attaching to WSL..."
-                        usbipd attach --wsl --busid $busid
-                        Write-Host "Attached."
-                    } else {
-                        Write-Host "WARNING: Could not find COM6 device in usbipd list. WSL may need manual USB attachment."
+                    $attached = $false
+                    $candidates = usbipd list | Select-String -Pattern "0403:6001"
+                    foreach ($line in $candidates) {
+                        $busid = ($line.ToString().Trim() -split "\s+")[0]
+                        Write-Host "Trying bus ID $busid..."
+                        usbipd bind --busid $busid --force 2>$null
+                        usbipd attach --wsl --busid $busid 2>$null
+                        Start-Sleep 2
+                        $com6_gone = -not (Get-WmiObject Win32_SerialPort | Where-Object { $_.DeviceID -eq "COM6" })
+                        if ($com6_gone) {
+                            Write-Host "COM6 device successfully attached to WSL via bus ID $busid"
+                            $attached = $true
+                            break
+                        }
+                        Write-Host "Bus ID $busid was not COM6, detaching..."
+                        usbipd detach --busid $busid 2>$null
+                    }
+                    if (-not $attached) {
+                        Write-Host "WARNING: Could not identify and attach COM6 device to WSL"
                     }
                 '''
             }
