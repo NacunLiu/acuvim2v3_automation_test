@@ -28,15 +28,16 @@ pipeline {
             }
 
             steps {
-                echo "Returning USB serial adapter to Windows if previously attached to WSL..."
+                echo "Returning USB serial adapter to Windows if previously shared with WSL..."
                 powershell '''
                     usbipd list | Select-String "0403:6001" | ForEach-Object {
                         $busid = ($_.ToString().Trim() -split " ")[0]
                         usbipd detach --busid $busid 2>$null
-                        Write-Host "Detached bus ID $busid — waiting for Windows to re-enumerate COM port..."
+                        usbipd unbind --busid $busid 2>$null
+                        Write-Host "Unbound bus ID $busid — returning to Windows driver"
                     }
-                    Start-Sleep 10
-                    Write-Host "Available serial ports after detach:"
+                    Start-Sleep 15
+                    Write-Host "Serial ports available after unbind:"
                     Get-WmiObject Win32_SerialPort | Select-Object DeviceID, Name | Format-Table
                     exit 0
                 '''
@@ -54,7 +55,9 @@ pipeline {
                     foreach ($line in $candidates) {
                         $busid = ($line.ToString().Trim() -split " ")[0]
                         Write-Host "Trying bus ID $busid..."
-                        usbipd attach --wsl --busid $busid
+                        usbipd bind --busid $busid --force 2>$null
+                        Start-Sleep 2
+                        usbipd attach --wsl --busid $busid 2>$null
                         Start-Sleep 5
                         $com6_gone = -not (Get-WmiObject Win32_SerialPort | Where-Object { $_.DeviceID -eq "COM6" })
                         if ($com6_gone) {
@@ -62,8 +65,10 @@ pipeline {
                             $attached = $true
                             break
                         }
-                        Write-Host "Bus ID $busid was not COM6, detaching..."
+                        Write-Host "Bus ID $busid was not COM6, releasing..."
                         usbipd detach --busid $busid 2>$null
+                        usbipd unbind --busid $busid 2>$null
+                        Start-Sleep 3
                     }
                     if (-not $attached) {
                         Write-Host "WARNING: Could not identify and attach COM6 device to WSL"
