@@ -39,7 +39,7 @@ pipeline {
                     $attached = $false
                     $candidates = usbipd list | Select-String -Pattern "0403:6001"
                     foreach ($line in $candidates) {
-                        $busid = ($line.ToString().Trim() -split "\s+")[0]
+                        $busid = ($line.ToString().Trim() -split " ")[0]
                         Write-Host "Trying bus ID $busid..."
                         usbipd bind --busid $busid --force 2>$null
                         usbipd attach --wsl --busid $busid 2>$null
