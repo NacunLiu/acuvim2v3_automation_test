@@ -12,7 +12,7 @@ echo "=== Adding jenkins user to dialout (serial port access) ==="
 sudo usermod -aG dialout jenkins
 
 echo "=== Enabling WSL mirrored networking for Kasa LAN access ==="
-WSLCONFIG="/mnt/c/Users/NacunLiu/.wslconfig"
+WSLCONFIG="${WSLCONFIG:-/mnt/c/Users/$(cmd.exe /c 'echo %USERNAME%' 2>/dev/null | tr -d '\r\n')/.wslconfig}"
 if grep -q "networkingMode" "$WSLCONFIG" 2>/dev/null; then
     echo "  .wslconfig already has networkingMode, skipping"
 else

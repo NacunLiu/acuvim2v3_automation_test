@@ -26,7 +26,7 @@ import logging,coloredlogs
 logger = logging.getLogger(__name__)
 coloredlogs.install(level='DEBUG', logger=logger, fmt='%(asctime)s %(hostname)s %(levelname)s %(message)s')
 current_folder = os.getcwd()
-csv_path = current_folder+'\\rootkey.csv'
+csv_path = os.path.join(current_folder, 'rootkey.csv')
 try:
     df = pd.read_csv(csv_path)
     AK = str(df['Access key ID'][0])
